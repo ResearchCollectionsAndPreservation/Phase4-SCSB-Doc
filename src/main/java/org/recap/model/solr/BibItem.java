@@ -107,6 +107,9 @@ public class BibItem {
     @Field("IsDeletedBib")
     private boolean isDeletedBib = false;
 
+    @Field("MatchingIdentifier")
+    private String matchingIdentifier;
+
     private String root;
 
     private List<Item> items = new ArrayList<>();

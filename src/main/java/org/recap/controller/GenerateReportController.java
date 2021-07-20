@@ -3,6 +3,7 @@ package org.recap.controller;
 import org.codehaus.plexus.util.StringUtils;
 import org.recap.ScsbCommonConstants;
 import org.recap.ScsbConstants;
+import org.recap.model.reports.TitleMatchedReport;
 import org.recap.model.solr.SolrIndexRequest;
 import org.recap.model.submitCollection.SubmitCollectionReport;
 import org.recap.report.ReportGenerator;
@@ -116,5 +117,38 @@ public class GenerateReportController {
         return (!submitCollectionReprot.isExportEnabled()) ?
                 new ResponseEntity<>(reportGenerator.accessionExceptionReportGenerator(submitCollectionReprot), HttpStatus.OK) :
                 new ResponseEntity<>(reportGenerator.accessionExceptionReportExport(submitCollectionReprot), HttpStatus.OK);
+    }
+
+    /**
+     *
+     * @param titleMatchedReport
+     * @return List of TitleMatchCount
+     * @throws ParseException
+     */
+    @PostMapping("/titleMatchCount")
+    public ResponseEntity<TitleMatchedReport> titleMatchCount(@RequestBody TitleMatchedReport titleMatchedReport) throws ParseException {
+        return  new ResponseEntity<>(reportGenerator.getItemMatchCount(titleMatchedReport),HttpStatus.OK);
+    }
+
+    /**
+     *
+     * @param titleMatchedReport
+     * @return List of TitleMatchReport
+     * @throws ParseException
+     */
+    @PostMapping("/titleMatchReport")
+    public ResponseEntity<TitleMatchedReport> titleMatchReport(@RequestBody TitleMatchedReport titleMatchedReport) throws ParseException {
+        return  new ResponseEntity<>(reportGenerator.getItemMatchReport(titleMatchedReport),HttpStatus.OK);
+    }
+
+    /**
+     *
+     * @param titleMatchedReport
+     * @return List of TitleMatchReport
+     * @throws ParseException
+     */
+    @PostMapping("/titleMatchReportExport")
+    public ResponseEntity<TitleMatchedReport> titleMatchReportExport(@RequestBody TitleMatchedReport titleMatchedReport) throws ParseException {
+        return  new ResponseEntity<>(reportGenerator.getItemMatchReportExport(titleMatchedReport),HttpStatus.OK);
     }
 }

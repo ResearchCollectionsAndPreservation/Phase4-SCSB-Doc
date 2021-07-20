@@ -15,6 +15,7 @@ public final class ScsbConstants {
     public static final String TITLE_SUBFIELD_A = "Title_subfield_a";
     public static final String USE_RESTRICTION_DISPLAY = "UseRestriction_display";
     public static final String SUCCESS = "success";
+    public static final String TITLE_MATCHED = "Matched";
     //Camel Queues Constants
     public static final String FS_SUBMIT_COLLECTION_EXCEPTION_REPORT_Q = "scsbactivemq:queue:fsSubmitCollectionExceptionReportQ";
     public static final String FTP_SUBMIT_COLLECTION_EXCEPTION_REPORT_Q = "scsbactivemq:queue:ftpSubmitCollectionExceptionReportQ";
@@ -102,6 +103,7 @@ public final class ScsbConstants {
     public static final String OWNING_INSTITUTION_ITEM_ID = "OwningInstitutionItemId";
     public static final String BIB_CREATED_DATE = "BibCreatedDate";
     public static final String BIB_LAST_UPDATED_DATE = "BibLastUpdatedDate";
+    public static final String MATCHING_IDENTIFIER = "MatchingIdentifier";
     public static final String DATE = "Date";
     public static final String COLUMN_CREATED_DATE = "CREATED_DATE";
     public static final String ITEM_BARCDE_DOESNOT_EXIST = "Item Barcode doesn't exist in SCSB database.";
@@ -221,7 +223,9 @@ public final class ScsbConstants {
     public static final String LOG_EXECUTION_TIME = "Time taken to execute {} : {}";
     public static final String INSTITUTION = "Institution";
     public static final String CGD_ROUND_TRIP_EXCEPTION_MESSAGE = "The reported item is not found";
-
+    public static final String EXCEPTION_TITLE_MATCH_REPORT = "Exception Occured while pulling records for TitleMatchReports:: {}";
+    public static final String EXCEPTION_TITLE_MATCH_COUNT = "Exception Occured while pulling records for TitleMatchCount:: {} ";
+    public static final String EXCEPTION_TITLE_MATCH_EXPORT = "Exception Occured while pulling records for TitleMatchExportReports:: {}";
     public static class ServicePath {
         private ServicePath() {}
         public static final String REPLACE_REQUEST = "requestItem/replaceRequest";

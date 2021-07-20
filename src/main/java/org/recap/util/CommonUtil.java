@@ -17,6 +17,7 @@ import org.recap.model.jpa.ItemStatusEntity;
 import org.recap.model.search.resolver.BibValueResolver;
 import org.recap.model.search.resolver.HoldingsValueResolver;
 import org.recap.model.search.resolver.ItemValueResolver;
+import org.recap.model.search.resolver.impl.bib.MatchingIdentifierValueResolver;
 import org.recap.model.search.resolver.impl.bib.TitleSubFieldAValueResolver;
 import org.recap.model.search.resolver.impl.bib.AuthorDisplayValueResolver;
 import org.recap.model.search.resolver.impl.bib.AuthorSearchValueResolver;
@@ -173,6 +174,7 @@ public class CommonUtil {
             bibValueResolvers.add(new TitleSubFieldAValueResolver());
             bibValueResolvers.add(new IsDeletedBibValueResolver());
             bibValueResolvers.add(new BibCreatedDateValueResolver());
+            bibValueResolvers.add(new MatchingIdentifierValueResolver());
         }
         return bibValueResolvers;
     }

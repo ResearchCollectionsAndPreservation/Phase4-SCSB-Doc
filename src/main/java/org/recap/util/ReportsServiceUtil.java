@@ -19,10 +19,16 @@ import org.recap.model.jpa.DeaccessionItemChangeLog;
 import org.recap.model.reports.ReportsInstitutionForm;
 import org.recap.model.reports.ReportsRequest;
 import org.recap.model.reports.ReportsResponse;
+import org.recap.model.reports.TitleMatchCount;
+import org.recap.model.reports.TitleMatchedReport;
+import org.recap.model.reports.TitleMatchedReports;
 import org.recap.model.search.DeaccessionItemResultsRow;
 import org.recap.model.search.IncompleteReportResultsRow;
+import org.recap.model.solr.Bib;
+import org.recap.model.solr.BibItem;
 import org.recap.model.solr.Item;
 import org.recap.repository.jpa.DeaccesionItemChangeLogDetailsRepository;
+import org.recap.repository.solr.impl.BibSolrDocumentRepositoryImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.solr.core.SolrTemplate;
 import org.springframework.stereotype.Service;
@@ -40,6 +46,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
+import static org.apache.camel.component.mail.SearchTermBuilder.Op.*;
+
 /**
  * Created by rajeshbabuk on 13/1/17.
  */
@@ -51,6 +59,9 @@ public class ReportsServiceUtil {
 
     @Autowired
     private SolrQueryBuilder solrQueryBuilder;
+
+    @Autowired
+    private BibSolrDocumentRepositoryImpl bibSolrDocumentRepository;
 
     @Autowired
     private DeaccesionItemChangeLogDetailsRepository deaccesionItemChangeLogDetailsRepository;
@@ -388,7 +399,10 @@ public class ReportsServiceUtil {
     private SimpleDateFormat getSimpleDateFormatForReports() {
         return new SimpleDateFormat(ScsbCommonConstants.SIMPLE_DATE_FORMAT_REPORTS);
     }
-
+    private String convertDateToString(Date date){
+        SimpleDateFormat dateFormat = getSimpleDateFormatForReports();
+        return dateFormat.format(date);
+    }
     private String getFormattedDateString(Date inputDate) throws ParseException {
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat(ScsbCommonConstants.DATE_FORMAT_YYYYMMDDHHMM);
         String utcStr;
@@ -398,5 +412,147 @@ public class ReportsServiceUtil {
         format.setTimeZone(TimeZone.getTimeZone(ScsbCommonConstants.UTC));
         utcStr = format.format(date);
         return utcStr;
+    }
+    public TitleMatchedReport titleMatchCount(TitleMatchedReport titleMatchedReport) throws Exception {
+        List<TitleMatchCount> titleMatchCountList = new ArrayList<>();
+        String solrFormattedDate = getSolrFormattedDates(convertDateToString(titleMatchedReport.getFromDate()),convertDateToString(titleMatchedReport.getToDate()));
+        for(String titleMatch: titleMatchedReport.getTitleMatch()) {
+            for (String owningInstitution : titleMatchedReport.getOwningInst()) {
+                for (String cgd : titleMatchedReport.getCgd()) {
+                    TitleMatchCount titleMatchCount = new TitleMatchCount();
+                    String matchingIdentifier = (titleMatch.equals(ScsbConstants.TITLE_MATCHED)) ?
+                            "" : "-";
+                    SolrQuery query = solrQueryBuilder.buildQueryTitleMatchCount(solrFormattedDate, owningInstitution, cgd,matchingIdentifier);
+                    QueryResponse queryResponse = solrTemplate.getSolrClient().query(query);
+                    long count = queryResponse.getResults().getNumFound();
+                    titleMatchCount.setCount(count);
+                    titleMatchCount.setTitleMatched(titleMatch);
+                    titleMatchCount.setCgd(cgd);
+                    titleMatchCount.setOwningInst(owningInstitution);
+                    titleMatchCountList.add(titleMatchCount);
+                }
+            }
+        }
+        titleMatchedReport.setTitleMatchCounts(titleMatchCountList);
+        return titleMatchedReport;
+    }
+
+    public TitleMatchedReport titleMatchReports(TitleMatchedReport titleMatchedReport) throws Exception {
+        List<BibItem> bibItems = new ArrayList<>();
+        SolrQuery query = appendSolrQueryForTitle(titleMatchedReport);
+        query.setRows(titleMatchedReport.getPageSize());
+        query.setStart((titleMatchedReport.getPageNumber() * (titleMatchedReport.getPageSize())));
+        query.setSort(ScsbConstants.BIB_CREATED_DATE, SolrQuery.ORDER.desc);
+        QueryResponse queryResponse = solrTemplate.getSolrClient().query(query);
+        titleMatchedReport.setTotalRecordsCount(queryResponse.getResults().getNumFound());
+        int totalPagesCount = (int) Math.ceil((double) (titleMatchedReport.getTotalRecordsCount()) / (double) (titleMatchedReport.getPageSize()));
+        titleMatchedReport.setTotalPageCount(totalPagesCount);
+        SolrDocumentList bibSolrDocumentList = queryResponse.getResults();
+        setDataForBibItems(bibSolrDocumentList,bibItems);
+        return setBibItems(titleMatchedReport, bibItems);
+    }
+
+    private TitleMatchedReport setBibItems(TitleMatchedReport titleMatchedReport, List<BibItem> bibItems) {
+        List<TitleMatchedReports> titleMatchedReportsList = new ArrayList<>();
+        for (BibItem bibItem : bibItems) {
+            TitleMatchedReports titleMatchedReports = new TitleMatchedReports();
+            titleMatchedReports.setBibId(bibItem.getOwningInstitutionBibId());
+            if(bibItem.getItems().size() == 1)
+                titleMatchedReports.setItemBarcode(bibItem.getItems().get(0).getBarcode());
+            else
+                titleMatchedReports.setItemBarcodes(getBarcodes(bibItem));
+            titleMatchedReports.setLccn(bibItem.getLccn());
+            titleMatchedReports.setDuplicateCode(bibItem.getMatchingIdentifier());
+            titleMatchedReports.setCreatedDate(bibItem.getBibCreatedDate());
+            titleMatchedReports.setScsbId(bibItem.getBibId());
+            titleMatchedReportsList.add(titleMatchedReports);
+        }
+        titleMatchedReport.setTitleMatchedReports(titleMatchedReportsList);
+        return titleMatchedReport;
+    }
+    private StringBuilder appendInsts(TitleMatchedReport titleMatchedReport){
+        StringBuilder owningInstAppend = new StringBuilder();
+        for (String owningInstitution : titleMatchedReport.getOwningInst()) {
+            if(titleMatchedReport.getOwningInst().get(titleMatchedReport.getOwningInst().size()-1).equalsIgnoreCase(owningInstitution))
+                owningInstAppend.append(owningInstitution);
+            else
+                owningInstAppend.append(owningInstitution+ " OR ");
+        }
+        return owningInstAppend;
+    }
+    private StringBuilder appendCGDs(TitleMatchedReport titleMatchedReport){
+        StringBuilder cgdAppend = new StringBuilder();
+        for (String cgd : titleMatchedReport.getCgd()) {
+            if(titleMatchedReport.getCgd().get(titleMatchedReport.getCgd().size()-1).equalsIgnoreCase(cgd))
+                cgdAppend.append(cgd);
+            else
+                cgdAppend.append(cgd + " OR ");
+        }
+        return cgdAppend;
+    }
+    public TitleMatchedReport titleMatchReportsExport(TitleMatchedReport titleMatchedReport) throws Exception {
+        List<BibItem> bibItems = new ArrayList<>();
+        SolrQuery query = appendSolrQueryForTitle(titleMatchedReport);
+        query.setRows(Integer.MAX_VALUE);
+        query.setSort(ScsbConstants.BIB_CREATED_DATE, SolrQuery.ORDER.desc);
+        QueryResponse queryResponse = solrTemplate.getSolrClient().query(query);
+        SolrDocumentList bibSolrDocumentList = queryResponse.getResults();
+        setDataForBibItems(bibSolrDocumentList,bibItems);
+        return setBibItemsExport(titleMatchedReport, bibItems);
+    }
+    private TitleMatchedReport setBibItemsExport(TitleMatchedReport titleMatchedReport, List<BibItem> bibItems) {
+        List<TitleMatchedReports> titleMatchedReportsList = new ArrayList<>();
+        for (BibItem bibItem : bibItems) {
+            titleMatchedReportsList.add(setDataToTitleMatchReports(bibItem));
+        }
+        titleMatchedReport.setTitleMatchedReports(titleMatchedReportsList);
+        return titleMatchedReport;
+    }
+    private List<String> getBarcodes(BibItem bibItem) {
+        List<String> barcodes = new ArrayList<>();
+        for (Item item : bibItem.getItems()) {
+            if (item.getBarcode().equalsIgnoreCase(bibItem.getItems().get(bibItem.getItems().size() - 1).getBarcode()))
+                barcodes.add(item.getBarcode());
+            else
+                barcodes.add(item.getBarcode() + ",");
+        }
+        return barcodes;
+    }
+    private String getBarcodesExport(BibItem bibItem) {
+        StringBuilder barcodes = new StringBuilder();
+        for (Item item : bibItem.getItems()) {
+            barcodes.append(item.getBarcode()+",");
+        }
+        return barcodes.toString();
+    }
+    private TitleMatchedReports setDataToTitleMatchReports(BibItem bibItem){
+        TitleMatchedReports titleMatchedReports = new TitleMatchedReports();
+        titleMatchedReports.setBibId(bibItem.getOwningInstitutionBibId());
+        titleMatchedReports.setItemBarcode(getBarcodesExport(bibItem));
+        titleMatchedReports.setLccn(bibItem.getLccn());
+        titleMatchedReports.setDuplicateCode(bibItem.getMatchingIdentifier());
+        titleMatchedReports.setCreatedDate(bibItem.getBibCreatedDate());
+        titleMatchedReports.setScsbId(bibItem.getBibId());
+        return titleMatchedReports;
+    }
+
+    private SolrQuery appendSolrQueryForTitle(TitleMatchedReport titleMatchedReport) throws ParseException {
+        String solrFormattedDate = getSolrFormattedDates(convertDateToString(titleMatchedReport.getFromDate()), convertDateToString(titleMatchedReport.getToDate()));
+        StringBuilder owningInstAppend = appendInsts(titleMatchedReport);
+        StringBuilder cgdAppend = appendCGDs(titleMatchedReport);
+        String matchingIdentifier = (titleMatchedReport.getTitleMatch().get(0).equals(ScsbConstants.TITLE_MATCHED)) ?
+                "" : "-";
+        SolrQuery query = solrQueryBuilder.buildQueryTitleMatchedReport(solrFormattedDate, owningInstAppend, cgdAppend, matchingIdentifier);
+        return query;
+    }
+    private  void setDataForBibItems( SolrDocumentList bibSolrDocumentList,List<BibItem> bibItems){
+        if (CollectionUtils.isNotEmpty(bibSolrDocumentList)) {
+            for (SolrDocument bibSolrDocument : bibSolrDocumentList) {
+                BibItem bibItem = new BibItem();
+                bibSolrDocumentRepository.populateBibItem(bibSolrDocument, bibItem);
+                bibSolrDocumentRepository.populateItemHoldingsInfo(bibItem, false, ScsbCommonConstants.COMPLETE_STATUS);
+                bibItems.add(bibItem);
+            }
+        }
     }
 }

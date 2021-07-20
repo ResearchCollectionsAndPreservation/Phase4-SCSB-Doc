@@ -5,9 +5,11 @@ import org.recap.ScsbCommonConstants;
 import org.recap.ScsbConstants;
 import org.recap.model.csv.SubmitCollectionReportRecord;
 import org.recap.model.jpa.ReportEntity;
+import org.recap.model.reports.TitleMatchedReport;
 import org.recap.model.submitCollection.SubmitCollectionReport;
 import org.recap.model.submitCollection.SubmitCollectionResultsRow;
 import org.recap.repository.jpa.ReportDetailRepository;
+import org.recap.util.ReportsServiceUtil;
 import org.recap.util.SubmitCollectionReportGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,6 +92,9 @@ public class ReportGenerator {
 
     @Autowired
     private FSSubmitCollectionFailureReportGenerator fsSubmitCollectionFailureReportGenerator;
+
+    @Autowired
+    private ReportsServiceUtil reportsServiceUtil;
 
     /**
      * This method is used to generate report based on the reportType.
@@ -294,5 +299,29 @@ public class ReportGenerator {
         }
         submitCollectionReprot.setSubmitCollectionResultsRows(submitCollectionResultsRowsList);
         return submitCollectionReprot;
+    }
+    public TitleMatchedReport getItemMatchCount(TitleMatchedReport titleMatchedReport){
+        try {
+            return reportsServiceUtil.titleMatchCount(titleMatchedReport);
+        } catch (Exception e){
+            logger.info(ScsbConstants.EXCEPTION_TITLE_MATCH_COUNT,e.getMessage());
+            return titleMatchedReport;
+        }
+    }
+    public TitleMatchedReport getItemMatchReport(TitleMatchedReport titleMatchedReport){
+        try {
+            return reportsServiceUtil.titleMatchReports(titleMatchedReport);
+        } catch (Exception e){
+            logger.info(ScsbConstants.EXCEPTION_TITLE_MATCH_REPORT,e.getMessage());
+            return titleMatchedReport;
+        }
+    }
+    public TitleMatchedReport getItemMatchReportExport(TitleMatchedReport titleMatchedReport){
+        try {
+            return reportsServiceUtil.titleMatchReportsExport(titleMatchedReport);
+        } catch (Exception e){
+            logger.info(ScsbConstants.EXCEPTION_TITLE_MATCH_EXPORT,e.getMessage());
+            return titleMatchedReport;
+        }
     }
 }
